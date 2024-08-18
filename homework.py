@@ -1,7 +1,6 @@
 import os
 import requests
 import logging
-from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from telebot import TeleBot
 import time
@@ -29,11 +28,11 @@ HOMEWORK_VERDICTS = {
 def check_tokens():
     """Проверка наличия инициализации переменных окружения"""
     if (PRACTICUM_TOKEN is None or TELEGRAM_TOKEN is None or
-        TELEGRAM_CHAT_ID is None):
+            TELEGRAM_CHAT_ID is None):
         message = """Отсутствует определение одной
         или нескольких переменных окружения"""
         logging.critical(message)
-        raise Exception(message) 
+        raise Exception(message)
 
 
 def send_message(bot, message):
@@ -41,11 +40,10 @@ def send_message(bot, message):
     try:
         bot.send_message(
             chat_id=TELEGRAM_CHAT_ID,
-            text=message,
-        )
+            text=message,)
         logging.debug(message)
     except Exception as error:
-        logging.error(f'ОШибка отправки сообщения в Telegram.{error}')
+        logging.error('Ошибка отправки сообщения в Telegram.'+error)
 
 
 def get_api_answer(timestamp):
