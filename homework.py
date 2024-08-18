@@ -26,9 +26,8 @@ HOMEWORK_VERDICTS = {
 
 
 def check_tokens():
-    """Проверка наличия инициализации переменных окружения"""
-    if (PRACTICUM_TOKEN is None or TELEGRAM_TOKEN is None or
-            TELEGRAM_CHAT_ID is None):
+    """Проверка наличия инициализации переменных окружения."""
+    if None in [PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID]:
         message = """Отсутствует определение одной
         или нескольких переменных окружения"""
         logging.critical(message)
@@ -36,18 +35,18 @@ def check_tokens():
 
 
 def send_message(bot, message):
-    """Отправка сообщения в Telegram"""
+    """Отправка сообщения в Telegram."""
     try:
         bot.send_message(
             chat_id=TELEGRAM_CHAT_ID,
             text=message,)
         logging.debug(message)
     except Exception as error:
-        logging.error('Ошибка отправки сообщения в Telegram.'+error)
+        logging.error('Ошибка отправки сообщения в Telegram.' + error)
 
 
 def get_api_answer(timestamp):
-    """Запрос от api информации об изменении статуса дом.работ"""
+    """Запрос от api информации об изменении статуса дом.работ."""
     payload = {'from_date': timestamp}
     try:
         response = requests.get(ENDPOINT, headers=HEADERS,
@@ -64,7 +63,7 @@ def get_api_answer(timestamp):
 
 
 def check_response(response):
-    """Проверка ответа api"""
+    """Проверка ответа api."""
     err_message = 'Данные в ответе api имеют неожиданную структуру'
     if 'homeworks' not in response:
         logging.error(err_message)
@@ -78,7 +77,7 @@ def check_response(response):
 
 
 def parse_status(homework):
-    """Получение статуса конкретной работы"""
+    """Получение статуса конкретной работы."""
     if 'homework_name' not in homework or 'status' not in homework:
         logging.error('Данные в ответе api имеют неожиданную структуру')
         raise TypeError
@@ -96,7 +95,6 @@ def parse_status(homework):
 
 def main():
     """Основная логика работы бота."""
-
     logging.basicConfig(
         format='%(asctime)s [%(levelname)s] %(message)s',
         level=logging.DEBUG,
@@ -121,7 +119,7 @@ def main():
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
             logging.error(message)
-        logging.debug(f'Пауза {RETRY_PERIOD} сек')  
+        logging.debug(f'Пауза {RETRY_PERIOD} сек')
         time.sleep(RETRY_PERIOD)
 
 
