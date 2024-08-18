@@ -98,8 +98,7 @@ def main():
     logging.basicConfig(
         format='%(asctime)s [%(levelname)s] %(message)s',
         level=logging.DEBUG,
-        encoding='UTF-8',
-        )
+        encoding='UTF-8',)
     check_tokens()
     # Создаем объект класса бота
     bot = TeleBot(token=TELEGRAM_TOKEN)
