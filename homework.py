@@ -38,8 +38,8 @@ def check_tokens():
     missing_tokens = [var_name for var_name in verifiable_tokens
                       if not globals()[var_name]]
     if missing_tokens:
-        logging.critical('Отсутствует определение переменных'
-                         'окружения:' + ','.join(missing_tokens))
+        logging.critical('Отсутствует определение переменных '
+                         'окружения: ' + ','.join(missing_tokens))
         raise ValueError
 
 
@@ -58,11 +58,15 @@ def get_api_answer(timestamp):
         response = requests.get(ENDPOINT, headers=HEADERS,
                                 params=payload)
     except requests.RequestException as error:
-        raise ConnectionError(f'{ENDPOINT} {HEADERS} {payload} : {error}')
+        raise ConnectionError('Ошибка при отправке запроса '
+                              f'к {ENDPOINT} с параметрами '
+                              f'{payload} : {error}')
 
     if response.status_code != HTTPStatus.OK:
-        raise UnexpectedAPIResponseError(f'{ENDPOINT} {HEADERS} {payload} :'
-                                         ' {response.status_code}')
+        raise UnexpectedAPIResponseError('Ошибка при отправке запроса '
+                                         f'к {ENDPOINT} с параметрами '
+                                         f'{payload} : status_code = '
+                                         f'{response.status_code}')
     logging.debug('Получен ответ на запрос к API')
     return response.json()
 
@@ -72,7 +76,7 @@ def check_response(response):
     logging.debug('Начата проверка ответа api')
     if not isinstance(response, dict):
         raise TypeError('Данные ответа api получены в неожиданном виде,'
-                        f' тип: {type(response)}')
+                        f' тип: {type(response)}. Ожидается dict.')
     if 'homeworks' not in response:
         raise KeyError('Ключ homeworks отсутствует в ответе api')
     hw_type = type(response['homeworks'])
@@ -114,7 +118,7 @@ def main():
             check_response(response)
             homeworks = response['homeworks']
             if not homeworks:
-                logging.debug('Обновлений статуса домашней работы'
+                logging.debug('Обновлений статуса домашней работы '
                               'не зафиксировано')
                 continue
             message = parse_status(homeworks[0])
@@ -134,7 +138,7 @@ def main():
                     last_bot_message = message
             except (telebot.apihelper.ApiException,
                     requests.exceptions.RequestException) as tb_error:
-                message = (f'Сбой отправки сообщения о сбое работы программы '
+                message = ('Сбой отправки сообщения о сбое работы программы '
                            f'в Telegram: {tb_error}')
                 logging.exception(message)
         finally:
