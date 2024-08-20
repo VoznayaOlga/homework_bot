@@ -1,13 +1,15 @@
 import os
-
+import sys
 import logging
 import time
+from http import HTTPStatus
+
 import requests
 import telebot
-
 from dotenv import load_dotenv
-from http import HTTPStatus
 from telebot import TeleBot
+
+from homework_exception import UnexpectedAPIResponseError
 
 
 load_dotenv()
@@ -29,22 +31,15 @@ HOMEWORK_VERDICTS = {
 }
 
 
-class ProgramOperationError(Exception):
-    """Ошибка в работе программы."""
-
-    pass
-
-
 def check_tokens():
     """Проверка наличия инициализации переменных окружения."""
     verifiable_tokens = ('PRACTICUM_TOKEN', 'TELEGRAM_TOKEN',
                          'TELEGRAM_CHAT_ID')
     missing_tokens = [var_name for var_name in verifiable_tokens
-                      if globals()[var_name] in [None, '']]
-    if len(missing_tokens) > 0:
-        for i, var_name in enumerate(missing_tokens):
-            logging.critical('Отсутствует определение переменной'
-                             'окружения' + var_name)
+                      if not globals()[var_name]]
+    if missing_tokens:
+        logging.critical('Отсутствует определение переменных'
+                         'окружения:' + ','.join(missing_tokens))
         raise ValueError
 
 
@@ -63,12 +58,11 @@ def get_api_answer(timestamp):
         response = requests.get(ENDPOINT, headers=HEADERS,
                                 params=payload)
     except requests.RequestException as error:
-        raise ConnectionError(error)
+        raise ConnectionError(f'{ENDPOINT} {HEADERS} {payload} : {error}')
 
     if response.status_code != HTTPStatus.OK:
-        err_message = f'Ошибка запроса к API {response}'
-        logging.error(err_message)
-        raise ProgramOperationError(err_message)
+        raise UnexpectedAPIResponseError(f'{ENDPOINT} {HEADERS} {payload} :'
+                                         ' {response.status_code}')
     logging.debug('Получен ответ на запрос к API')
     return response.json()
 
@@ -76,14 +70,14 @@ def get_api_answer(timestamp):
 def check_response(response):
     """Проверка ответа api."""
     logging.debug('Начата проверка ответа api')
-    if type(response) is not dict:
-        raise TypeError(f'Данные ответа api получены в неожиданном виде,'
+    if not isinstance(response, dict):
+        raise TypeError('Данные ответа api получены в неожиданном виде,'
                         f' тип: {type(response)}')
     if 'homeworks' not in response:
         raise KeyError('Ключ homeworks отсутствует в ответе api')
     hw_type = type(response['homeworks'])
-    if hw_type is not list:
-        raise TypeError(f'Блок howeworks получен не в виде списка, '
+    if not isinstance(response['homeworks'], list):
+        raise TypeError('Блок howeworks получен не в виде списка, '
                         f'тип {hw_type}')
     logging.debug('Проверка ответа api успешно завершена')
 
@@ -97,14 +91,13 @@ def parse_status(homework):
         raise KeyError('В блоке homework отсутствует ключ status')
     homework_name = homework['homework_name']
     status = homework['status']
-    if status in HOMEWORK_VERDICTS.keys():
-        verdict = HOMEWORK_VERDICTS[status]
-        logging.warn(verdict)
-        logging.debug('Получение статуса домашней работы завершено успешно')
-        return f'Изменился статус проверки работы "{homework_name}". {verdict}'
-    err_message = (f'Получен недокументированный cnатус {status} домашней '
-                   f'работы или статус не указан')
-    raise ValueError(err_message)
+    if status not in HOMEWORK_VERDICTS.keys():
+        raise ValueError(f'Получен недокументированный статус {status} '
+                         'домашней работы или статус не указан')
+    verdict = HOMEWORK_VERDICTS[status]
+    logging.warn(verdict)
+    logging.debug('Получение статуса домашней работы завершено успешно')
+    return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
 
 def main():
@@ -113,30 +106,32 @@ def main():
     # Создаем объект класса бота
     bot = TeleBot(token=TELEGRAM_TOKEN)
     timestamp = int(time.time())
+    last_bot_message = ''
 
     while True:
         try:
             response = get_api_answer(timestamp=timestamp)
             check_response(response)
             homeworks = response['homeworks']
-            if len(homeworks) > 0:
-                message = parse_status(homeworks[0])
-                send_message(bot=bot, message=message)
-            else:
+            if not homeworks:
                 logging.debug('Обновлений статуса домашней работы'
                               'не зафиксировано')
-                timestamp = response.get('current_date', timestamp)
                 continue
-            timestamp = response.get('current_date', timestamp)
+            message = parse_status(homeworks[0])
+            if message != last_bot_message:
+                send_message(bot=bot, message=message)
+                timestamp = response.get('current_date', timestamp)
+                last_bot_message = message
         except (telebot.apihelper.ApiException,
                 requests.exceptions.RequestException) as error:
-            message = f'Сбой отправки сообщения в Telegram: {error}'
-            logging.exception(message)
+            logging.exception(f'Сбой отправки сообщения в Telegram: {error}')
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
             logging.exception(message)
             try:
-                send_message(bot=bot, message=message)
+                if message != last_bot_message:
+                    send_message(bot=bot, message=message)
+                    last_bot_message = message
             except (telebot.apihelper.ApiException,
                     requests.exceptions.RequestException) as tb_error:
                 message = (f'Сбой отправки сообщения о сбое работы программы '
@@ -149,7 +144,9 @@ def main():
 
 if __name__ == '__main__':
     logging.basicConfig(
-        format='%(asctime)s [%(levelname)s] %(message)s',
+        format='%(asctime)s [%(levelname)s] [%(funcName)s] '
+        '[%(lineno)d] %(message)s',
         level=logging.DEBUG,
-        encoding='UTF-8',)
+        encoding='UTF-8',
+        handlers=[logging.StreamHandler(sys.stdout)])
     main()
